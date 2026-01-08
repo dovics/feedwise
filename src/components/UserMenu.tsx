@@ -25,8 +25,10 @@ export function UserMenu() {
   }, []);
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/auth/signin" });
     setIsOpen(false);
+    await signOut({ callbackUrl: "/auth/signin", redirect: false });
+    router.push("/auth/signin");
+    router.refresh();
   };
 
   const handleNavigate = (path: string) => {
@@ -44,30 +46,30 @@ export function UserMenu() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors focus-ring"
         title={session.user?.email || 'User'}
       >
         {userInitial}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
-          <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+        <div className="absolute right-0 mt-2 w-48 bg-theme-surface rounded-lg shadow-lg border border-theme py-1 z-50">
+          <div className="px-4 py-2 border-b border-theme-subtle">
+            <p className="text-sm font-medium text-theme-primary truncate">
               {session.user?.email}
             </p>
           </div>
 
           <button
             onClick={() => handleNavigate('/profile')}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="w-full text-left px-4 py-2 text-sm text-theme-primary hover:bg-theme-surface/80 transition-colors"
           >
             {t('profile')}
           </button>
 
           <button
             onClick={() => handleNavigate('/settings')}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="w-full text-left px-4 py-2 text-sm text-theme-primary hover:bg-theme-surface/80 transition-colors"
           >
             {t('settings')}
           </button>
@@ -75,17 +77,17 @@ export function UserMenu() {
           {session.user?.role && ["ADMIN", "SUPER_ADMIN"].includes(session.user.role) && (
             <button
               onClick={() => handleNavigate('/admin')}
-              className="w-full text-left px-4 py-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="w-full text-left px-4 py-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-theme-surface/80 transition-colors"
             >
               {t('admin')}
             </button>
           )}
 
-          <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+          <div className="border-t border-theme-subtle my-1"></div>
 
           <button
             onClick={handleLogout}
-            className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-theme-surface/80 transition-colors"
           >
             {t('logout')}
           </button>

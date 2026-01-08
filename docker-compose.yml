@@ -27,7 +27,7 @@ services:
       - "3000:3000"
     environment:
       DATABASE_URL: postgresql://feedflow:feedflow@postgres:5432/feedflow?schema=public
-      NEXTAUTH_SECRET: your-secret-key-change-this-in-production
+      DEFAULT_ADMIN_PASSWORD: your-secret-key-change-this-in-production
       NODE_ENV: production
     depends_on:
       postgres:

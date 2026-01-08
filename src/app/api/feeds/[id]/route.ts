@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
 const updateFeedSchema = z.object({
-  tags: z.array(z.string().min(1).max(50)).optional()
+  tags: z.array(z.string().min(1).max(50)).optional(),
+  defaultReadStatus: z.boolean().optional()
 });
 
 export async function PATCH(
@@ -34,11 +35,19 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { tags } = updateFeedSchema.parse(body);
+    const { tags, defaultReadStatus } = updateFeedSchema.parse(body);
+
+    const updateData: { tags?: string[]; defaultReadStatus?: boolean } = {};
+    if (tags !== undefined) {
+      updateData.tags = tags;
+    }
+    if (defaultReadStatus !== undefined) {
+      updateData.defaultReadStatus = defaultReadStatus;
+    }
 
     const updatedFeed = await prisma.feed.update({
       where: { id: feedId },
-      data: { tags: tags || [] }
+      data: updateData
     });
 
     return NextResponse.json({ feed: updatedFeed });

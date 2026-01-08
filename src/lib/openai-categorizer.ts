@@ -66,7 +66,7 @@ export async function categorizeFeed(feedInfo: FeedInfo): Promise<string[] | nul
       .map((item, index) => `${index + 1}. ${item.title || "Untitled"}: ${item.description || ""}`)
       .join("\n");
 
-    const prompt = `你是一个RSS订阅源分类助手。请根据以下信息，为这个RSS订阅源分配一个合适的分类。
+    const prompt = `你是一个RSS订阅源分类助手。请根据以下信息，为这个RSS订阅源分配合适的标签。
 
 RSS源信息：
 - 标题: ${feedTitle}
@@ -76,7 +76,7 @@ RSS源信息：
 最近的文章内容（前5篇）：
 ${itemsText || "暂无文章内容"}
 
-请从以下常见分类中选择最合适的一个（如果都不合适，可以建议一个新的分类）：
+请从以下常见标签中选择最合适的2-5个（如果都不合适，可以建议新的标签）：
 - 技术
 - 新闻
 - 财经
@@ -95,9 +95,18 @@ ${itemsText || "暂无文章内容"}
 - 文化
 - 艺术
 - 政治
+- AI
+- 编程
+- 产品
+- 商业
+- 创业
+- 数据
+- 云计算
+- 前端
+- 后端
 - 其他
 
-请只返回分类名称，不要包含任何其他文字或解释。`;
+请只返回标签名称，多个标签用中文逗号（，）分隔，不要包含任何其他文字或解释。`;
 
     const response = await fetch(`${config.baseURL}/chat/completions`, {
       method: "POST",
@@ -110,7 +119,7 @@ ${itemsText || "暂无文章内容"}
         messages: [
           {
             role: "system",
-            content: "你是一个专业的RSS订阅源分类助手。你的任务是分析RSS源的内容，并为其分配最合适的分类。只返回分类名称，不要包含任何解释。"
+            content: "你是一个专业的RSS订阅源分类助手。你的任务是分析RSS源的内容，并为其分配2-5个最合适的标签。只返回标签名称，多个标签用中文逗号分隔，不要包含任何解释。"
           },
           {
             role: "user",
@@ -118,7 +127,7 @@ ${itemsText || "暂无文章内容"}
           }
         ],
         temperature: 0.3,
-        max_tokens: 20
+        max_tokens: 50
       })
     });
 
@@ -129,15 +138,25 @@ ${itemsText || "暂无文章内容"}
     }
 
     const data = await response.json();
-    const category = data.choices?.[0]?.message?.content?.trim();
+    const tagsText = data.choices?.[0]?.message?.content?.trim();
 
-    if (!category) {
-      console.error("No category returned from OpenAI");
+    if (!tagsText) {
+      console.error("No tags returned from OpenAI");
       return null;
     }
 
-    console.log(`Feed "${feedTitle}" categorized as: ${category}`);
-    return [category];
+    const tags = tagsText
+      .split(/[,，]/)
+      .map((tag: string) => tag.trim())
+      .filter((tag: string) => tag.length > 0);
+
+    if (tags.length === 0) {
+      console.error("No valid tags found in response");
+      return null;
+    }
+
+    console.log(`Feed "${feedTitle}" categorized with tags: ${tags.join(", ")}`);
+    return tags;
   } catch (error) {
     console.error("Failed to categorize feed:", error);
     return null;

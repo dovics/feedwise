@@ -161,7 +161,7 @@
     "loading": "加载中..."
   },
   "reader": {
-    "settings": "阅读设置",
+    "settings": "主题设置",
     "errorNotFound": "未找到该文章",
     "errorLoading": "加载文章失败",
     "fontSize": "字体大小",

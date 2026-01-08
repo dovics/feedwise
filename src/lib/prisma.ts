@@ -1,4 +1,5 @@
 import { PrismaClient } from "@/generated/prisma/client";
+import { initializeApplication } from "./initialize";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -7,3 +8,8 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma = globalForPrisma.prisma ?? new PrismaClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+initializeApplication().catch((error) => {
+  console.error("[Prisma] Failed to initialize application:", error);
+  process.exit(1);
+});

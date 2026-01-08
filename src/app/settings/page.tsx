@@ -11,6 +11,7 @@ interface Feed {
   title: string;
   url: string;
   tags: string[];
+  defaultReadStatus: boolean;
   createdAt: string;
   _count: {
     items: number;
@@ -33,6 +34,11 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
+  const [editingFeedId, setEditingFeedId] = useState<string | null>(null);
+  const [editingForm, setEditingForm] = useState({
+    tags: "",
+    defaultReadStatus: false
+  });
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -76,6 +82,32 @@ export default function SettingsPage() {
       }
 
       await fetchFeeds();
+      setError("");
+    } catch (error) {
+      setError(t('errors.network'));
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const updateFeed = async (feedId: string, tags: string[], defaultReadStatus: boolean) => {
+    try {
+      setSaving(feedId);
+      const res = await fetch(`/api/feeds/${feedId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tags, defaultReadStatus })
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || t('errors.unknown'));
+        return;
+      }
+
+      await fetchFeeds();
+      setEditingFeedId(null);
+      setEditingForm({ tags: "", defaultReadStatus: false });
       setError("");
     } catch (error) {
       setError(t('errors.network'));
@@ -197,6 +229,63 @@ export default function SettingsPage() {
     }
   };
 
+  const openEdit = (feed: Feed) => {
+    setEditingFeedId(feed.id);
+    setEditingForm({
+      tags: feed.tags.join(", "),
+      defaultReadStatus: feed.defaultReadStatus
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingFeedId(null);
+    setEditingForm({ tags: "", defaultReadStatus: false });
+  };
+
+  const autoCategorizeFeed = async (feedId: string) => {
+    if (!editingFeedId) return;
+
+    try {
+      setSaving(feedId);
+      const res = await fetch(`/api/feeds/${feedId}/categorize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feedId })
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || t('errors.unknown'));
+        return;
+      }
+
+      const data = await res.json();
+      if (data.feed && data.feed.tags) {
+        setEditingForm({
+          ...editingForm,
+          tags: data.feed.tags.join(", ")
+        });
+        await fetchFeeds();
+      }
+      setError("");
+    } catch (error) {
+      setError(t('errors.network'));
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingFeedId) return;
+
+    const tagArray = editingForm.tags
+      .split(/[,，]/)
+      .map(t => t.trim())
+      .filter(t => t.length > 0);
+
+    updateFeed(editingFeedId, tagArray, editingForm.defaultReadStatus);
+  };
+
   const toggleBatchEdit = () => {
     setBatchEditMode(!batchEditMode);
     setSelectedFeeds(new Set());
@@ -292,14 +381,14 @@ export default function SettingsPage() {
   const allTags = getAllTags();
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+    <div className="min-h-screen">
+      <nav className="bg-theme-surface-transparent backdrop-blur-sm border-b border-theme px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('nav.title')}</h1>
+          <h1 className="text-2xl font-bold text-theme-primary">{t('nav.title')}</h1>
           <div className="flex items-center gap-4">
             <a
               href="/"
-              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium transition-colors"
+              className="text-sm text-theme-secondary hover:text-theme-primary font-medium transition-colors"
             >
               {t('nav.home')}
             </a>
@@ -334,10 +423,10 @@ export default function SettingsPage() {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              <h2 className="text-2xl font-bold text-theme-primary mb-2">
                 {tSettings('title')}
               </h2>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p className="text-theme-secondary">
                 {tSettings('description')}
               </p>
             </div>
@@ -345,7 +434,7 @@ export default function SettingsPage() {
               {!batchEditMode ? (
                 <button
                   onClick={toggleBatchEdit}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
+                  className="px-4 py-2 bg-theme-button-primary hover:bg-theme-button-primary-hover text-white rounded-md text-sm font-medium transition-colors"
                 >
                   {tSettings('feeds.batchAddTags')}
                 </button>
@@ -359,7 +448,7 @@ export default function SettingsPage() {
                   </button>
                   <button
                     onClick={selectAllFeeds}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
+                    className="px-4 py-2 bg-theme-button-primary hover:bg-theme-button-primary-hover text-white rounded-md text-sm font-medium transition-colors"
                   >
                     {selectedFeeds.size === feeds.length ? tSettings('feeds.cancelSelectAll') : tSettings('feeds.selectAll')}
                   </button>
@@ -380,13 +469,13 @@ export default function SettingsPage() {
                     value={batchTags}
                     onChange={(e) => setBatchTags(e.target.value)}
                     placeholder={tSettings('feeds.batchTagsPlaceholder')}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    className="w-full px-4 py-2 border border-theme rounded-md focus-ring bg-theme-input text-theme-text"
                   />
                 </div>
                 <button
                   onClick={handleBatchUpdateTags}
                   disabled={selectedFeeds.size === 0 || loading}
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2 bg-theme-button-primary hover:bg-theme-button-primary-hover text-white rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? t('common.save') : tSettings('feeds.applyTo', { count: selectedFeeds.size })}
                 </button>
@@ -397,26 +486,26 @@ export default function SettingsPage() {
             </div>
           )}
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="bg-theme-surface rounded-lg shadow-theme border border-theme">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-4">
               <div className="flex-1">
                 <input
                   type="text"
                   placeholder={tSettings('feeds.searchPlaceholder')}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  className="w-full px-4 py-2 border border-theme rounded-md focus-ring bg-theme-input text-theme-text placeholder-theme-text-secondary"
                 />
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-sm text-theme-secondary">
                 {tSettings('feeds.total', { count: feeds.length })}
               </div>
             </div>
 
             {loading ? (
-              <div className="py-12 text-center text-gray-600 dark:text-gray-400">
+              <div className="py-12 text-center text-theme-secondary">
                 {t('common.loading')}
               </div>
             ) : feeds.length === 0 ? (
-              <div className="py-12 text-center text-gray-600 dark:text-gray-400">
+              <div className="py-12 text-center text-theme-secondary">
                 <p className="mb-4">{tSettings('feeds.noFeeds')}</p>
                 <a
                   href="/"
@@ -433,7 +522,7 @@ export default function SettingsPage() {
                     className={`px-6 py-4 transition-colors ${
                       batchEditMode && selectedFeeds.has(feed.id)
                         ? "bg-blue-50 dark:bg-blue-900/30"
-                        : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                        : "hover:bg-theme-hover"
                     }`}
                   >
                     <div className="flex items-start gap-4">
@@ -442,47 +531,112 @@ export default function SettingsPage() {
                           type="checkbox"
                           checked={selectedFeeds.has(feed.id)}
                           onChange={() => toggleSelectFeed(feed.id)}
-                          className="mt-1 h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-400 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                          className="mt-1 h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-400 focus-ring cursor-pointer"
                         />
                       )}
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                            <h3 className="text-lg font-semibold text-theme-primary mb-1">
                               {feed.title || "无标题"}
                             </h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 break-all">
+                            <p className="text-sm text-theme-secondary mb-2 break-all">
                               {feed.url}
                             </p>
-                            <div className="flex items-center gap-4">
-                              <div className="flex flex-wrap gap-2">
-                                {feed.tags && feed.tags.length > 0 ? (
-                                  feed.tags.map((tag) => (
-                                    <span
-                                      key={tag}
-                                      onClick={() => removeTagFromFeed(feed.id, tag)}
-                                      className="px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded cursor-pointer hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-800 dark:hover:text-red-200 transition-colors"
-                                      title={tSettings('feeds.clickToRemoveTag')}
+                            {editingFeedId === feed.id ? (
+                              <div className="space-y-4 mb-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-md">
+                                <div>
+                                  <label className="block text-sm font-medium text-theme-primary mb-2">
+                                    默认状态
+                                  </label>
+                                  <select
+                                    value={editingForm.defaultReadStatus ? "read" : "unread"}
+                                    onChange={(e) => setEditingForm({
+                                      ...editingForm,
+                                      defaultReadStatus: e.target.value === "read"
+                                    })}
+                                    className="w-full px-3 py-2 border border-theme rounded-md focus-ring bg-theme-input text-theme-text text-sm"
+                                  >
+                                    <option value="unread">未读</option>
+                                    <option value="read">已读</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-theme-primary mb-2">
+                                    标签（多个标签用逗号分隔）
+                                  </label>
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      placeholder={tSettings('feeds.tagsPlaceholder')}
+                                      value={editingForm.tags}
+                                      onChange={(e) => setEditingForm({
+                                        ...editingForm,
+                                        tags: e.target.value
+                                      })}
+                                      className="flex-1 px-3 py-2 border border-theme rounded-md focus-ring bg-theme-input text-theme-text text-sm placeholder-theme-text-secondary"
+                                    />
+                                    <button
+                                      onClick={() => autoCategorizeFeed(feed.id)}
+                                      disabled={saving === feed.id}
+                                      className="px-4 py-2 bg-theme-button-primary hover:bg-theme-button-primary-hover text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                      title="自动识别"
                                     >
-                                      {tag} ×
-                                    </span>
-                                  ))
-                                ) : (
-                                  <span className="text-xs text-gray-400 dark:text-gray-500">{tSettings('feeds.noTags')}</span>
-                                )}
+                                      {saving === feed.id ? "识别中..." : "自动识别"}
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
-                              <span className="text-sm text-gray-500 dark:text-gray-400">
-                                {feed._count.items} 篇文章
-                              </span>
-                              <span className="text-xs text-gray-400 dark:text-gray-500">
-                                {new Date(feed.createdAt).toLocaleDateString('zh-CN')}
-                              </span>
-                            </div>
+                            ) : (
+                              <div className="flex items-center gap-4">
+                                <div className="flex flex-wrap gap-2">
+                                  {feed.tags && feed.tags.length > 0 ? (
+                                    feed.tags.map((tag) => (
+                                      <span
+                                        key={tag}
+                                        onClick={() => removeTagFromFeed(feed.id, tag)}
+                                        className="px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded cursor-pointer hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-800 dark:hover:text-red-200 transition-colors"
+                                        title={tSettings('feeds.clickToRemoveTag')}
+                                      >
+                                        {tag} ×
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-xs text-theme-muted">{tSettings('feeds.noTags')}</span>
+                                  )}
+                                </div>
+                                <span className="text-sm text-theme-secondary">
+                                  默认状态: {feed.defaultReadStatus ? "已读" : "未读"}
+                                </span>
+                                <span className="text-sm text-theme-secondary">
+                                  {feed._count.items} 篇文章
+                                </span>
+                                <span className="text-xs text-theme-muted">
+                                  {new Date(feed.createdAt).toLocaleDateString('zh-CN')}
+                                </span>
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                            {editingTagsId === feed.id ? (
+                            {editingFeedId === feed.id ? (
+                              <>
+                                <button
+                                  onClick={handleSaveEdit}
+                                  disabled={saving === feed.id}
+                                  className="px-3 py-2 bg-theme-button-primary hover:bg-theme-button-primary-hover text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {saving === feed.id ? "保存中" : "保存"}
+                                </button>
+                                <button
+                                  onClick={cancelEdit}
+                                  className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md text-sm font-medium transition-colors"
+                                >
+                                  {t('common.cancel')}
+                                </button>
+                              </>
+                            ) : editingTagsId === feed.id ? (
                               <>
                                 <input
                                   type="text"
@@ -491,29 +645,38 @@ export default function SettingsPage() {
                                   onKeyDown={(e) => {
                                     if (e.key === "Enter") {
                                       handleSaveTags(feed.id);
-                                    } else if (e.key === "Escape") {
-                                      setEditingTagsId(null);
-                                      setEditingTags("");
                                     }
                                   }}
-                                  onBlur={() => {
-                                    if (editingTagsId === feed.id) {
-                                      handleSaveTags(feed.id);
-                                    }
-                                  }}
-                                  className="w-48 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                                  className="w-48 px-3 py-2 border border-theme rounded-md focus-ring bg-theme-input text-theme-text text-sm placeholder-theme-text-secondary"
                                   autoFocus
                                 />
                                 <button
                                   onClick={() => handleSaveTags(feed.id)}
                                   disabled={saving === feed.id}
-                                  className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="px-3 py-2 bg-theme-button-primary hover:bg-theme-button-primary-hover text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {saving === feed.id ? "保存中" : "添加"}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingTagsId(null);
+                                    setEditingTags("");
+                                  }}
+                                  className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md text-sm font-medium transition-colors"
+                                >
+                                  {t('common.cancel')}
                                 </button>
                               </>
                             ) : (
                               <>
+                                <button
+                                  onClick={() => openEdit(feed)}
+                                  className="p-2 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 rounded-md transition-colors"
+                                  title="编辑"
+                                  disabled={batchEditMode}
+                                >
+                                  ✏️
+                                </button>
                                 <button
                                   onClick={() => {
                                     setEditingTagsId(feed.id);
@@ -554,17 +717,17 @@ export default function SettingsPage() {
           </div>
 
           <div className="mt-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <h3 className="text-lg font-semibold text-theme-primary mb-4">
               {tSettings('feeds.allTags')}
             </h3>
             <div className="flex flex-wrap gap-2">
               {allTags.length === 0 ? (
-                <span className="text-sm text-gray-500 dark:text-gray-400">{tSettings('feeds.noTags')}</span>
+                <span className="text-sm text-theme-secondary">{tSettings('feeds.noTags')}</span>
               ) : (
                 allTags.map((tag) => (
                   <span
                     key={tag}
-                    className="px-3 py-1 text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full"
+                    className="px-3 py-1 text-sm font-medium bg-theme-hover text-theme-primary rounded-full"
                   >
                     {tag}
                   </span>

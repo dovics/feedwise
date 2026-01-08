@@ -21,48 +21,56 @@ enum UserRole {
 }
 
 model User {
-  id              String   @id @default(cuid())
-  email           String   @unique
-  password        String
-  name            String?
-  role            UserRole  @default(USER)
-  readingSettings Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id              String   @id @default(cuid()) @map("id")
+  email           String   @unique @map("email")
+  password        String   @map("password")
+  name            String?  @map("name")
+  role            UserRole  @default(USER) @map("role")
+  readingSettings Json?    @map("reading_settings")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
   feeds           Feed[]
+
+  @@map("user")
 }
 
 model Feed {
-  id        String   @id @default(cuid())
-  url       String
-  title     String?
-  tags      String[] @default(["未分类"])
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  items     Item[]
+  id                String   @id @default(cuid()) @map("id")
+  url               String   @map("url")
+  title             String?  @map("title")
+  tags              String[] @default(["未分类"]) @map("tags")
+  defaultReadStatus Boolean  @default(false) @map("default_read_status")
+  userId            String   @map("user_id")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  items             Item[]
 
   @@unique([userId, url])
+  @@map("feed")
 }
 
 model Item {
-  id        String   @id @default(cuid())
-  title     String
-  link      String?
-  description String?
-  pubDate   DateTime?
-  feedId    String
-  feed      Feed     @relation(fields: [feedId], references: [id], onDelete: Cascade)
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid()) @map("id")
+  title       String   @map("title")
+  link        String?  @map("link")
+  description String?  @map("description")
+  pubDate     DateTime? @map("pub_date")
+  feedId      String   @map("feed_id")
+  feed        Feed     @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  read        Boolean  @default(false) @map("read")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("item")
 }
 
 model SystemConfig {
-  id          String   @id @default(cuid())
-  key         String   @unique
-  value       String
-  description String?
-  updatedAt   DateTime @updatedAt
+  id          String   @id @default(cuid()) @map("id")
+  key         String   @unique @map("key")
+  value       String   @map("value")
+  description String?  @map("description")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("systemconfig")
 }

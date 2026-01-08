@@ -7,6 +7,9 @@ export interface ReadingSettings {
   textColor: string; // 文本颜色 (hex)
 }
 
+// ThemeSettings is the same as ReadingSettings, applied globally to the entire app
+export type ThemeSettings = ReadingSettings;
+
 export const FONT_FAMILIES = [
   {
     value: "'Inter', system-ui, -apple-system, sans-serif",

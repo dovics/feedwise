@@ -179,13 +179,15 @@ export default function AdminPanel() {
   };
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/auth/signin" });
+    await signOut({ callbackUrl: "/auth/signin", redirect: false });
+    router.push("/auth/signin");
+    router.refresh();
   };
 
   if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600 dark:text-gray-400">Loading...</div>
+        <div className="text-theme-secondary">Loading...</div>
       </div>
     );
   }
@@ -195,21 +197,21 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+    <div className="min-h-screen">
+      <nav className="bg-theme-surface-transparent backdrop-blur-sm border-b border-theme px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{tAdmin('title')}</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{tAdmin('subtitle')}</p>
+            <h1 className="text-2xl font-bold text-theme-primary">{tAdmin('title')}</h1>
+            <p className="text-sm text-theme-secondary mt-1">{tAdmin('subtitle')}</p>
           </div>
           <div className="flex items-center gap-4">
             <a
               href="/"
-              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors"
+              className="text-sm text-accent hover:text-opacity-80 font-medium transition-colors"
             >
               {tAdmin('backToHome')}
             </a>
-            <span className="text-sm text-gray-700 dark:text-gray-300">
+            <span className="text-sm text-theme-primary">
               {session.user.email}
             </span>
             <button
@@ -224,28 +226,28 @@ export default function AdminPanel() {
 
         <div className="max-w-4xl mx-auto px-6 py-8">
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            <h2 className="text-2xl font-bold text-theme-primary mb-2">
               {tAdmin('systemConfig')}
             </h2>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-theme-secondary">
               {tAdmin('systemConfigDesc')}
             </p>
           </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-            <p className="text-sm font-medium text-red-900 dark:text-red-300">{error}</p>
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-sm font-medium text-red-900">{error}</p>
           </div>
         )}
 
         {loading ? (
           <div className="flex justify-center py-12">
-            <div className="text-gray-600 dark:text-gray-400">{tCommon('loading')}</div>
+            <div className="text-theme-secondary">{tCommon('loading')}</div>
           </div>
         ) : (
           <div className="space-y-6">
             {/* 配置项 */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="bg-theme-surface rounded-lg shadow-sm border border-theme">
               {configs.map((config) => {
                 let title = config.key;
                 let isToggle = false;
@@ -277,15 +279,15 @@ export default function AdminPanel() {
                 return (
                   <div
                     key={config.key}
-                    className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                    className="px-6 py-4 border-b border-theme last:border-b-0"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                        <h3 className="text-lg font-semibold text-theme-primary mb-1">
                           {title}
                         </h3>
                         {config.description && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                          <p className="text-sm text-theme-secondary">
                             {config.description}
                           </p>
                         )}
@@ -299,7 +301,7 @@ export default function AdminPanel() {
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                               (pendingChanges[config.key] ?? config.value) === "true"
                                 ? "bg-green-600 text-white"
-                                : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                             } ${saving ? "opacity-50 cursor-not-allowed" : ""}`}
                           >
                             启用
@@ -310,7 +312,7 @@ export default function AdminPanel() {
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                               (pendingChanges[config.key] ?? config.value) === "false"
                                 ? "bg-red-600 text-white"
-                                : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                             } ${saving ? "opacity-50 cursor-not-allowed" : ""}`}
                           >
                             禁用
@@ -327,7 +329,7 @@ export default function AdminPanel() {
                             placeholder={isPassword ? "输入 API 密钥" : "输入配置值"}
                             onChange={(e) => handleConfigChange(config.key, e.target.value)}
                             disabled={saving}
-                            className="w-64 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-64 px-3 py-2 border border-theme rounded-md bg-theme-surface text-theme-primary focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
                           />
                         </div>
                       )}
@@ -335,9 +337,9 @@ export default function AdminPanel() {
                   </div>
                   );
                })}
-              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end items-center gap-3">
+              <div className="px-6 py-4 border-t border-theme flex justify-end items-center gap-3">
                 {Object.keys(pendingChanges).length > 0 && (
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                  <span className="text-sm text-theme-muted">
                     {Object.keys(pendingChanges).length} 项配置已修改
                   </span>
                 )}
@@ -352,16 +354,16 @@ export default function AdminPanel() {
             </div>
 
             {session?.user?.role === "SUPER_ADMIN" && (
-              <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-purple-900 dark:text-purple-300 mb-3">
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-purple-900 mb-3">
                   👥 用户管理
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                <p className="text-sm text-theme-secondary mb-4">
                   管理平台用户及权限
                 </p>
 
                 {users.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <div className="text-center py-8 text-theme-muted">
                     暂无用户
                   </div>
                 ) : (
@@ -369,13 +371,13 @@ export default function AdminPanel() {
                     {users.map((user) => (
                       <div
                         key={user.id}
-                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-md"
+                        className="flex items-center justify-between p-3 bg-theme-subtle rounded-md"
                       >
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900 dark:text-white truncate">
+                          <p className="font-medium text-theme-primary truncate">
                             {user.name || "未命名"}
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          <p className="text-xs text-theme-muted truncate">
                             {user.email}
                           </p>
                         </div>
@@ -392,7 +394,7 @@ export default function AdminPanel() {
                             {user.role === "USER" && "👥 "}
                             {user.role}
                           </span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                          <span className="text-xs text-theme-muted">
                             {user._count.feeds} 个订阅
                           </span>
                           {user.id !== session.user.id && (
@@ -400,7 +402,7 @@ export default function AdminPanel() {
                               value={user.role}
                               onChange={(e) => promoteUser(user.id, e.target.value)}
                               disabled={promotingUser === user.id}
-                              className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="px-3 py-1 text-xs border border-theme rounded bg-theme-surface text-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <option value="USER">普通用户</option>
                               <option value="ADMIN">管理员</option>

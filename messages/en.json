@@ -161,7 +161,7 @@
     "loading": "Loading..."
   },
   "reader": {
-    "settings": "Reading Settings",
+    "settings": "Theme Settings",
     "errorNotFound": "Article not found",
     "errorLoading": "Failed to load article",
     "fontSize": "Font Size",

@@ -13,7 +13,6 @@
 - 🎨 深色/浅色主题切换
 - 自动跟随系统主题偏好
 - 优化的颜色对比度（符合 WCAG 标准）
-- ⏰ RSS 自动刷新（管理员配置）
 - 增量文章添加（基于链接去重）
 - 👤 管理员权限系统
 - 平台配置管理
@@ -282,16 +281,6 @@ NEXTAUTH_SECRET=your-production-secret
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 ```
 
-#### 启用 RSS 自动刷新（可选）
-
-如果要使用内置的 cron 服务：
-
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production --profile with-cron up -d
-```
-
-这会每小时自动刷新所有 RSS 源。
-
 #### 开发环境
 
 1. 启动开发数据库：
@@ -397,7 +386,6 @@ npx prisma generate
 
 - [x] 深色/浅色主题切换
 - [x] 管理员权限系统
-- [x] RSS 自动刷新
 - [x] 增量文章添加
 - [ ] 添加文章阅读状态标记
 - [ ] 支持文章收藏
@@ -411,7 +399,6 @@ npx prisma generate
 
 - **[用户指南](./USER_GUIDE.md)** - 如何使用 FeedFlow
 - **[管理员指南](./ADMIN_GUIDE.md)** - 管理员功能和配置
-- **[Cron 设置指南](./CRON_SETUP.md)** - 配置 RSS 自动刷新
 - **[主题文档](./THEME.md)** - 主题系统说明
 - **[Prisma 故障排除](./PRISMA_TROUBLESHOOTING.md)** - 常见问题解决
 - **[API 测试](./API_TESTING.md)** - API 错误测试

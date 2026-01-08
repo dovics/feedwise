@@ -1,4 +1,4 @@
-import { ReadingSettings } from "@/types/reader";
+import { ThemeSettings } from "@/types/reader";
 
 interface ReaderContentProps {
   title: string;
@@ -6,7 +6,7 @@ interface ReaderContentProps {
   link: string;
   feedTitle: string;
   pubDate: string;
-  settings: ReadingSettings;
+  settings: ThemeSettings;
 }
 
 export function ReaderContent({
@@ -82,7 +82,7 @@ export function ReaderContent({
         ))}
       </div>
 
-      <footer className="mt-12 pt-6 border-t border-current opacity-50">
+      <footer className="mt-12 pt-6 border-t border-theme opacity-50">
         <div className="text-sm" style={{ fontFamily: settings.fontFamily }}>
           来自: {feedTitle}
         </div>
