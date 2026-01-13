@@ -9,6 +9,7 @@ CREATE TABLE "user" (
     "name" TEXT,
     "role" "UserRole" NOT NULL DEFAULT 'USER',
     "reading_settings" JSONB,
+    "summary_language" TEXT NOT NULL DEFAULT 'zh',
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -65,8 +66,29 @@ CREATE UNIQUE INDEX "feed_user_id_url_key" ON "feed"("user_id", "url");
 -- CreateIndex
 CREATE UNIQUE INDEX "systemconfig_key_key" ON "systemconfig"("key");
 
+-- CreateTable
+CREATE TABLE "daily_summary" (
+    "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "date" DATE NOT NULL,
+    "content" TEXT NOT NULL,
+    "language" TEXT NOT NULL DEFAULT 'zh',
+    "item_count" INTEGER NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "daily_summary_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "daily_summary_user_id_date_key" ON "daily_summary"("user_id", "date");
+CREATE INDEX "daily_summary_user_id_date_idx" ON "daily_summary"("user_id", "date");
+
 -- AddForeignKey
 ALTER TABLE "feed" ADD CONSTRAINT "feed_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "item" ADD CONSTRAINT "item_feed_id_fkey" FOREIGN KEY ("feed_id") REFERENCES "feed"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "daily_summary" ADD CONSTRAINT "daily_summary_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -75,7 +75,7 @@ export default function Home() {
       fetchFeeds();
 
       // Check and generate today's summary
-      fetch("/api/summaries/check-and-generate", {
+      fetch("/api/summaries/generate", {
         method: "POST"
       })
         .then(res => res.json())
@@ -455,7 +455,7 @@ export default function Home() {
     }
   };
 
-  const refreshSummary = async () => {
+  const generateSummary = async (force: boolean = false) => {
     setSummaryLoading(true);
     setSummaryError(null);
     setStreamingContent('');
@@ -501,85 +501,10 @@ export default function Home() {
                 setStreamingContent(fullContent);
               } else if (parsed.type === 'done') {
                 // Save the completed summary
-                const saveRes = await fetch("/api/summaries/generate", {
+                const saveRes = await fetch("/api/summaries/save", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ force: true, content: fullContent, itemCount: parsed.itemCount })
-                });
-                const saveData = await saveRes.json();
-                if (saveData.summary) {
-                  setSummary(saveData.summary);
-                }
-                setIsStreaming(false);
-                setStreamingContent('');
-                setSummaryLoading(false);
-                return;
-              }
-            } catch (e) {
-              // Skip invalid JSON
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Failed to stream summary:", error);
-      setSummaryError("网络错误，请稍后重试");
-      setIsStreaming(false);
-      setStreamingContent('');
-      setSummaryLoading(false);
-    }
-  };
-
-  const regenerateSummary = async () => {
-    setSummaryLoading(true);
-    setSummaryError(null);
-    setStreamingContent('');
-    setIsStreaming(true);
-
-    try {
-      const response = await fetch("/api/summaries/stream", {
-        method: "POST"
-      });
-
-      if (!response.ok) {
-        throw new Error('Stream request failed');
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let fullContent = '';
-
-      if (!reader) {
-        throw new Error('No reader available');
-      }
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            try {
-              const parsed = JSON.parse(data);
-
-              if (parsed.type === 'error') {
-                setSummaryError(parsed.data);
-                setIsStreaming(false);
-                setSummaryLoading(false);
-                return;
-              } else if (parsed.type === 'token') {
-                fullContent += parsed.data;
-                setStreamingContent(fullContent);
-              } else if (parsed.type === 'done') {
-                // Save the completed summary
-                const saveRes = await fetch("/api/summaries/generate", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ force: true, content: fullContent, itemCount: parsed.itemCount })
+                  body: JSON.stringify({ force, content: fullContent, itemCount: parsed.itemCount })
                 });
                 const saveData = await saveRes.json();
                 if (saveData.summary) {
@@ -633,8 +558,8 @@ export default function Home() {
           summary={summary}
           loading={summaryLoading}
           error={summaryError}
-          onRefresh={refreshSummary}
-          onRegenerate={regenerateSummary}
+          onRefresh={() => generateSummary(false)}
+          onRegenerate={() => generateSummary(true)}
           streamingContent={streamingContent}
           isStreaming={isStreaming}
         />

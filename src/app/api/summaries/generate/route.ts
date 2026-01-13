@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import { generateDailySummary, createDailySummary, getTodaySummary, getUserSummaryLanguage } from "@/lib/summary-generator";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,74 +12,51 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Parse request body to check if force regeneration is requested
-    const body = await req.json().catch(() => ({}));
-    const force = body.force === true;
-    const providedContent = body.content;
-    const providedItemCount = body.itemCount;
-
     // Check if summary already exists for today
     const existingSummary = await getTodaySummary(session.user.id);
-
-    if (existingSummary && !force && !providedContent) {
+    if (existingSummary) {
       return NextResponse.json({ summary: existingSummary });
     }
 
     // Get user's summary language preference
     const language = await getUserSummaryLanguage(session.user.id);
 
-    let content: string;
-    let itemCount: number;
+    // Calculate 24 hours ago
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    // If content is provided (from streaming endpoint), use it directly
-    if (providedContent) {
-      content = providedContent;
-      itemCount = providedItemCount || 0;
-    } else {
-      // Otherwise, generate summary
-      const result = await generateDailySummary(session.user.id, language);
-
-      if (!result.success) {
-        return NextResponse.json(
-          {
-            error: result.error || "Failed to generate summary",
-            summary: null
-          },
-          { status: 200 } // Return 200 instead of 500 to allow UI to display the error message
-        );
-      }
-
-      content = result.content!;
-      itemCount = result.itemCount || 0;
-    }
-
-    let summary;
-
-    if (existingSummary && force) {
-      // Update existing summary
-      summary = await prisma.dailySummary.update({
-        where: {
-          userId_date: {
-            userId: session.user.id,
-            date: existingSummary.date
-          }
+    // Check if there are any unread items in the last 24 hours
+    const itemCount = await prisma.item.count({
+      where: {
+        read: false,
+        pubDate: {
+          gte: twentyFourHoursAgo
         },
-        data: {
-          content: content,
-          language: language
+        feed: {
+          userId: session.user.id
         }
-      });
-    } else {
-      // Create new summary
-      summary = await createDailySummary(session.user.id, content, language, itemCount);
+      }
+    });
+
+    if (itemCount === 0) {
+      // No unread items, return null
+      return NextResponse.json({ summary: null });
     }
+
+    // Generate summary
+    const result = await generateDailySummary(session.user.id, language);
+
+    if (!result.success || !result.content) {
+      // Failed to generate, return null (don't show error to user on auto-check)
+      return NextResponse.json({ summary: null, error: result.error });
+    }
+
+    // Save to database with actual item count
+    const summary = await createDailySummary(session.user.id, result.content, language, result.itemCount || itemCount);
 
     return NextResponse.json({ summary });
   } catch (error) {
-    console.error("Failed to generate summary:", error);
-    return NextResponse.json(
-      { error: "Failed to generate summary" },
-      { status: 500 }
-    );
+    console.error("Failed to check and generate summary:", error);
+    // Return null on error (don't block user login)
+    return NextResponse.json({ summary: null });
   }
 }
