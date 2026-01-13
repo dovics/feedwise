@@ -19,13 +19,54 @@ export default function ProfilePage() {
   const [mounted, setMounted] = useState(false);
   const [savingThemeSettings, setSavingThemeSettings] = useState(false);
   const [themeSettingsMessage, setThemeSettingsMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [summaryLanguage, setSummaryLanguage] = useState("zh");
+  const [savingSummarySettings, setSavingSummarySettings] = useState(false);
+  const [summaryMessage, setSummaryMessage] = useState<string>("");
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/auth/signin");
+    } else if (status === "authenticated") {
+      fetchUserSettings();
     }
     setMounted(true);
   }, [status, router]);
+
+  const fetchUserSettings = async () => {
+    try {
+      const res = await fetch("/api/user/settings");
+      const data = await res.json();
+      if (res.ok && data.user?.summaryLanguage) {
+        setSummaryLanguage(data.user.summaryLanguage);
+      }
+    } catch (error) {
+      console.error("Failed to fetch user settings:", error);
+    }
+  };
+
+  const saveSummarySettings = async () => {
+    setSavingSummarySettings(true);
+    setSummaryMessage("");
+    try {
+      const res = await fetch("/api/user/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ summaryLanguage })
+      });
+
+      if (res.ok) {
+        setSummaryMessage("保存成功");
+        setTimeout(() => setSummaryMessage(""), 2000);
+      } else {
+        const data = await res.json();
+        setSummaryMessage(data.error || "保存失败");
+      }
+    } catch (error) {
+      setSummaryMessage("网络错误");
+    } finally {
+      setSavingSummarySettings(false);
+    }
+  };
 
   const handleLanguageChange = (newLocale: string) => {
     document.cookie = `locale=${newLocale}; path=/; max-age=31536000`;
@@ -344,6 +385,45 @@ export default function ProfilePage() {
                   {themeSettingsMessage.text}
                 </div>
               )}
+            </div>
+          </div>
+
+          <div className="bg-theme-surface rounded-lg shadow-theme border border-theme p-6">
+            <h2 className="text-xl font-semibold text-theme-primary mb-4">
+              每日摘要设置
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-theme-primary mb-2">
+                  摘要语言
+                </label>
+                <div className="flex items-center gap-4">
+                  <select
+                    value={summaryLanguage}
+                    onChange={(e) => setSummaryLanguage(e.target.value)}
+                    className="px-4 py-2 border border-theme rounded-md focus-ring bg-theme-input text-theme-text"
+                    disabled={savingSummarySettings}
+                  >
+                    <option value="zh">中文</option>
+                    <option value="en">English</option>
+                  </select>
+                  <button
+                    onClick={saveSummarySettings}
+                    disabled={savingSummarySettings}
+                    className="px-6 py-2 bg-theme-button-primary hover:bg-theme-button-primary-hover text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {savingSummarySettings ? "保存中..." : "保存设置"}
+                  </button>
+                </div>
+                <p className="mt-2 text-sm text-theme-secondary">
+                  选择每日新闻摘要的生成语言。更改后将在下次生成摘要时生效。
+                </p>
+                {summaryMessage && (
+                  <p className={`mt-2 text-sm ${summaryMessage === "保存成功" ? "text-green-600" : "text-red-600"}`}>
+                    {summaryMessage}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 

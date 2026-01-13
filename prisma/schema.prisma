@@ -22,15 +22,17 @@ enum UserRole {
 }
 
 model User {
-  id              String   @id @default(cuid()) @map("id")
-  email           String   @unique @map("email")
-  password        String   @map("password")
-  name            String?  @map("name")
-  role            UserRole  @default(USER) @map("role")
-  readingSettings Json?    @map("reading_settings")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  feeds           Feed[]
+  id               String   @id @default(cuid()) @map("id")
+  email            String   @unique @map("email")
+  password         String   @map("password")
+  name             String?  @map("name")
+  role             UserRole  @default(USER) @map("role")
+  readingSettings  Json?     @map("reading_settings")
+  summaryLanguage  String    @default("zh") @map("summary_language")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  feeds            Feed[]
+  summaries        DailySummary[]
 
   @@map("user")
 }
@@ -75,4 +77,21 @@ model SystemConfig {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("systemconfig")
+}
+
+model DailySummary {
+  id        String   @id @default(cuid()) @map("id")
+  userId    String   @map("user_id")
+  date      DateTime @map("date") @db.Date
+  content   String   @map("content") @db.Text
+  language  String   @default("zh") @map("language")
+  itemCount Int      @map("item_count")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("daily_summary")
 }

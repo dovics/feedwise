@@ -202,5 +202,18 @@
     "invalidUrl": "Please enter a valid URL",
     "network": "Network error, please try again later",
     "unknown": "Unknown error"
+  },
+  "summary": {
+    "title": "Today's Summary",
+    "generating": "Generating...",
+    "generationError": "Unable to generate summary",
+    "refresh": "Refresh Summary",
+    "regenerate": "Regenerate",
+    "noSummary": "Summary not yet generated",
+    "itemCount": "{count} articles",
+    "lastUpdated": "Last updated: {time}",
+    "language": "Summary Language",
+    "languageZh": "中文",
+    "languageEn": "English"
   }
 }

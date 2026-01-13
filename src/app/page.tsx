@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { UserMenu } from "@/components/UserMenu";
+import { DailySummary } from "@/components/DailySummary";
 
 interface Feed {
   id: string;
@@ -31,6 +32,14 @@ interface Item {
   };
 }
 
+interface DailySummaryData {
+  id: string;
+  date: string;
+  content: string;
+  language: string;
+  itemCount: number;
+}
+
 export default function Home() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -53,12 +62,34 @@ export default function Home() {
   const [autoRefreshed, setAutoRefreshed] = useState(false);
   const [feedsExpanded, setFeedsExpanded] = useState(true);
   const [refreshingAll, setRefreshingAll] = useState(false);
+  const [summary, setSummary] = useState<DailySummaryData | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [streamingContent, setStreamingContent] = useState<string>('');
+  const [isStreaming, setIsStreaming] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/auth/signin");
     } else if (status === "authenticated") {
       fetchFeeds();
+
+      // Check and generate today's summary
+      fetch("/api/summaries/check-and-generate", {
+        method: "POST"
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.summary) {
+            setSummary(data.summary);
+            setSummaryError(null);
+          } else if (data.error) {
+            setSummaryError(data.error);
+          }
+        })
+        .catch(error => {
+          console.error("Failed to check summary:", error);
+        });
 
       // 尝试从 sessionStorage 恢复状态
       const savedState = sessionStorage.getItem('feedflow_home_state');
@@ -424,6 +455,156 @@ export default function Home() {
     }
   };
 
+  const refreshSummary = async () => {
+    setSummaryLoading(true);
+    setSummaryError(null);
+    setStreamingContent('');
+    setIsStreaming(true);
+
+    try {
+      const response = await fetch("/api/summaries/stream", {
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        throw new Error('Stream request failed');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = '';
+
+      if (!reader) {
+        throw new Error('No reader available');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            try {
+              const parsed = JSON.parse(data);
+
+              if (parsed.type === 'error') {
+                setSummaryError(parsed.data);
+                setIsStreaming(false);
+                setSummaryLoading(false);
+                return;
+              } else if (parsed.type === 'token') {
+                fullContent += parsed.data;
+                setStreamingContent(fullContent);
+              } else if (parsed.type === 'done') {
+                // Save the completed summary
+                const saveRes = await fetch("/api/summaries/generate", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ force: true, content: fullContent, itemCount: parsed.itemCount })
+                });
+                const saveData = await saveRes.json();
+                if (saveData.summary) {
+                  setSummary(saveData.summary);
+                }
+                setIsStreaming(false);
+                setStreamingContent('');
+                setSummaryLoading(false);
+                return;
+              }
+            } catch (e) {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to stream summary:", error);
+      setSummaryError("网络错误，请稍后重试");
+      setIsStreaming(false);
+      setStreamingContent('');
+      setSummaryLoading(false);
+    }
+  };
+
+  const regenerateSummary = async () => {
+    setSummaryLoading(true);
+    setSummaryError(null);
+    setStreamingContent('');
+    setIsStreaming(true);
+
+    try {
+      const response = await fetch("/api/summaries/stream", {
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        throw new Error('Stream request failed');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = '';
+
+      if (!reader) {
+        throw new Error('No reader available');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            try {
+              const parsed = JSON.parse(data);
+
+              if (parsed.type === 'error') {
+                setSummaryError(parsed.data);
+                setIsStreaming(false);
+                setSummaryLoading(false);
+                return;
+              } else if (parsed.type === 'token') {
+                fullContent += parsed.data;
+                setStreamingContent(fullContent);
+              } else if (parsed.type === 'done') {
+                // Save the completed summary
+                const saveRes = await fetch("/api/summaries/generate", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ force: true, content: fullContent, itemCount: parsed.itemCount })
+                });
+                const saveData = await saveRes.json();
+                if (saveData.summary) {
+                  setSummary(saveData.summary);
+                }
+                setIsStreaming(false);
+                setStreamingContent('');
+                setSummaryLoading(false);
+                return;
+              }
+            } catch (e) {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to stream summary:", error);
+      setSummaryError("网络错误，请稍后重试");
+      setIsStreaming(false);
+      setStreamingContent('');
+      setSummaryLoading(false);
+    }
+  };
+
   if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -443,27 +624,21 @@ export default function Home() {
       <nav className="bg-theme-surface-transparent backdrop-blur-sm border-b border-theme px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <h1 className="text-2xl font-bold text-theme-primary">{t('nav.title')}</h1>
-          <div className="flex items-center gap-4">
-            <a
-              href="/settings"
-              className="text-sm text-accent hover:text-opacity-80 font-medium transition-colors"
-            >
-              {t('nav.settings')}
-            </a>
-            {["ADMIN", "SUPER_ADMIN"].includes(session.user?.role || '') && (
-              <a
-                href="/admin"
-                className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium transition-colors"
-              >
-                {t('nav.admin')}
-              </a>
-            )}
-            <UserMenu />
-          </div>
+          <UserMenu />
         </div>
       </nav>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
+        <DailySummary
+          summary={summary}
+          loading={summaryLoading}
+          error={summaryError}
+          onRefresh={refreshSummary}
+          onRegenerate={regenerateSummary}
+          streamingContent={streamingContent}
+          isStreaming={isStreaming}
+        />
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-1">
             <div className="bg-theme-surface backdrop-blur-sm rounded-lg shadow-theme border border-theme p-4">

@@ -202,5 +202,18 @@
     "invalidUrl": "请输入有效的 URL",
     "network": "网络错误，请稍后重试",
     "unknown": "未知错误"
+  },
+  "summary": {
+    "title": "今日摘要",
+    "generating": "生成中...",
+    "generationError": "无法生成摘要",
+    "refresh": "刷新摘要",
+    "regenerate": "重新生成",
+    "noSummary": "今日摘要尚未生成",
+    "itemCount": "{count} 篇文章",
+    "lastUpdated": "最后更新: {time}",
+    "language": "摘要语言",
+    "languageZh": "中文",
+    "languageEn": "English"
   }
 }
