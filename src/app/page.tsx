@@ -67,6 +67,7 @@ export default function Home() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState<string>('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [markReadError, setMarkReadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -404,11 +405,29 @@ export default function Home() {
 
   const markAsRead = async (itemId: string) => {
     try {
-      await fetch(`/api/items/${itemId}/read`, {
+      setMarkReadError(null);
+      const res = await fetch(`/api/items/${itemId}/read`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ read: true })
       });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
+        const errorMessage = errorData.error || res.statusText;
+
+        if (res.status === 404) {
+          // Item not found - remove it from local state
+          setItems(prevItems => prevItems.filter(item => item.id !== itemId));
+          setMarkReadError(tHome('items.errorNotFound') || "Article not found - removed from list");
+          // Auto-dismiss error after 3 seconds
+          setTimeout(() => setMarkReadError(null), 3000);
+        } else {
+          setMarkReadError(`${tHome('items.markAsReadError') || "Failed to mark as read"}: ${errorMessage}`);
+        }
+        console.error("Failed to mark item as read:", errorMessage);
+        return;
+      }
 
       setItems(prevItems =>
         prevItems.map(item =>
@@ -417,6 +436,7 @@ export default function Home() {
       );
     } catch (error) {
       console.error("Failed to mark item as read:", error);
+      setMarkReadError(tHome('items.networkError') || "Network error. Please try again.");
     }
   };
 
@@ -817,6 +837,26 @@ export default function Home() {
                   </button>
                 </div>
               </div>
+
+              {markReadError && (
+                <div className="mt-4 px-4 py-3 bg-red-50 border border-red-200 rounded-md flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-sm text-red-700">{markReadError}</span>
+                  </div>
+                  <button
+                    onClick={() => setMarkReadError(null)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+
               <div className="divide-y divide-theme-subtle">
                 {items.length === 0 ? (
                   <div className="px-6 py-12 text-center text-theme-secondary">
