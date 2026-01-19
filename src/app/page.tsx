@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { UserMenu } from "@/components/UserMenu";
 import { DailySummary } from "@/components/DailySummary";
+import { Sidebar } from "@/components/Sidebar";
 
 interface Feed {
   id: string;
@@ -68,6 +69,7 @@ export default function Home() {
   const [streamingContent, setStreamingContent] = useState<string>('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [markReadError, setMarkReadError] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -219,16 +221,6 @@ export default function Home() {
     }
   };
 
-  const getAllTags = () => {
-    const allTags = new Set<string>();
-    feeds.forEach(feed => {
-      if (feed.tags) {
-        feed.tags.forEach(tag => allTags.add(tag));
-      }
-    });
-    return Array.from(allTags).sort();
-  };
-
   const addFeed = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -333,6 +325,7 @@ export default function Home() {
     setItems([]);
     setPage(1);
     fetchItems(feedId, null, readStatusFilter, 1, false);
+    setSidebarOpen(false);
   };
 
   const handleAllFeedsClick = () => {
@@ -341,6 +334,7 @@ export default function Home() {
     setItems([]);
     setPage(1);
     fetchItems(null, null, readStatusFilter, 1, false);
+    setSidebarOpen(false);
   };
 
   const handleTagClick = (tag: string | null) => {
@@ -349,6 +343,7 @@ export default function Home() {
     setItems([]);
     setPage(1);
     fetchItems(undefined, tag, readStatusFilter, 1, false);
+    setSidebarOpen(false);
   };
 
   const handleReadStatusFilterChange = (filter: "all" | "read" | "unread") => {
@@ -562,18 +557,72 @@ export default function Home() {
     return null;
   }
 
-  const allTags = getAllTags();
-
   return (
-    <div className="min-h-screen">
-      <nav className="bg-theme-surface-transparent backdrop-blur-sm border-b border-theme px-6 py-4 relative z-50">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-theme-primary">{t('nav.title')}</h1>
+    <div className="min-h-screen flex flex-col">
+      <nav className="sticky top-0 z-50 bg-theme-surface-transparent backdrop-blur-sm border-b border-theme px-6 py-4">
+        <div className="max-w-full flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="lg:hidden p-2 rounded-md hover:bg-theme-surface/50 text-theme-primary transition-colors"
+              aria-label="Toggle sidebar"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <h1 className="text-2xl font-bold text-theme-primary">{t('nav.title')}</h1>
+          </div>
           <UserMenu />
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      {/* Mobile Sidebar Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Main Layout */}
+      <div className="flex flex-1 relative">
+        {/* Sidebar - Fixed on Desktop */}
+        <aside
+          className={`fixed lg:fixed inset-y-0 left-0 z-40 w-80 max-w-[85vw] transform transition-transform duration-300 ease-in-out ${
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          }`}
+        >
+          <div className="h-full overflow-y-auto bg-theme-surface lg:bg-transparent p-4 pt-[calc(73px+16px)] lg:p-0 lg:pt-4">
+            <div className="lg:sticky lg:top-[73px] lg:h-[calc(100vh-73px)] lg:overflow-y-auto lg:p-6 lg:border-r lg:border-theme lg:bg-theme-surface/50">
+              <Sidebar
+                feeds={feeds}
+                selectedFeedId={selectedFeedId}
+                selectedTag={selectedTag}
+                newFeedUrl={newFeedUrl}
+                loading={loading}
+                error={error}
+                feedsExpanded={feedsExpanded}
+                refreshingAll={refreshingAll}
+                refreshing={refreshing}
+                deletingFeed={deletingFeed}
+                onAddFeed={addFeed}
+                onNewFeedUrlChange={setNewFeedUrl}
+                onFeedClick={handleFeedClick}
+                onAllFeedsClick={handleAllFeedsClick}
+                onTagClick={handleTagClick}
+                onRefreshFeed={refreshFeed}
+                onDeleteFeed={deleteFeed}
+                onRefreshAllFeeds={refreshAllFeeds}
+                onToggleFeedsExpanded={() => setFeedsExpanded(!feedsExpanded)}
+              />
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Content Area */}
+        <div className="flex-1 lg:ml-80 min-w-0">
+          <div className="max-w-5xl mx-auto px-6 py-8">
         <DailySummary
           summary={summary}
           loading={summaryLoading}
@@ -584,108 +633,155 @@ export default function Home() {
           isStreaming={isStreaming}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-1">
-            <div className="bg-theme-surface backdrop-blur-sm rounded-lg shadow-theme border border-theme p-4">
-              <h2 className="text-lg font-semibold mb-4 text-theme-primary">{tHome('addFeed.title')}</h2>
-              <form onSubmit={addFeed} className="space-y-3">
-                <input
-                  type="url"
-                  placeholder={tHome('addFeed.placeholder')}
-                  value={newFeedUrl}
-                  onChange={(e) => setNewFeedUrl(e.target.value)}
-                  className="w-full px-3 py-2 border border-theme rounded-md focus-ring bg-theme-surface text-theme-primary placeholder-theme-muted"
-                  required
-                />
+        <div className="bg-theme-surface rounded-lg shadow-theme border border-theme">
+          <div className="px-6 py-4 border-b border-theme-subtle">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xl font-semibold text-theme-primary">
+                {selectedFeedId
+                  ? feeds.find((f) => f.id === selectedFeedId)?.title ||
+                    "Feed"
+                  : tHome('items.title')}
+                {selectedTag && ` - ${selectedTag}`}
+              </h2>
+              {items.some(item => !item.read) && (
                 <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full px-4 py-2 text-white bg-accent hover:bg-opacity-80 rounded-md transition-colors disabled:opacity-50"
+                  onClick={markAllAsRead}
+                  disabled={markingAllRead}
+                  className="px-3 py-1 text-sm font-medium text-accent hover:bg-accent/10 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? tHome('addFeed.adding') : tHome('addFeed.button')}
+                  {markingAllRead ? "标记中..." : "全部已读"}
                 </button>
-              </form>
-
-              {error && (
-                <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                  <div className="flex items-start gap-2">
-                    <svg
-                      className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-red-900 dark:text-red-300">{t('errors.required')}</p>
-                      <p className="text-sm text-red-800 dark:text-red-400 mt-1">{error}</p>
-                    </div>
-                  </div>
-                </div>
               )}
             </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleReadStatusFilterChange("all")}
+                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                  readStatusFilter === "all"
+                    ? "bg-accent text-white"
+                    : "bg-theme-surface text-theme-primary hover:bg-theme-surface/80"
+                }`}
+              >
+                {tHome('filter.all')}
+              </button>
+              <button
+                onClick={() => handleReadStatusFilterChange("unread")}
+                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                  readStatusFilter === "unread"
+                    ? "bg-accent text-white"
+                    : "bg-theme-surface text-theme-primary hover:bg-theme-surface/80"
+                }`}
+              >
+                {tHome('filter.unread')}
+              </button>
+              <button
+                onClick={() => handleReadStatusFilterChange("read")}
+                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                  readStatusFilter === "read"
+                    ? "bg-accent text-white"
+                    : "bg-theme-surface text-theme-primary hover:bg-theme-surface/80"
+                }`}
+              >
+                {tHome('filter.read')}
+              </button>
+            </div>
+          </div>
 
-            {feeds.length > 0 && (
-              <div className="bg-theme-surface rounded-lg shadow-theme border border-theme p-4 mt-4">
-                <h2 className="text-lg font-semibold mb-4 text-theme-primary">{tHome('tags.title')}</h2>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleTagClick(null)}
-                    className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                      selectedTag === null
-                        ? "bg-accent text-white"
-                        : "bg-theme-surface text-theme-primary hover:bg-theme-surface/80"
+          {markReadError && (
+            <div className="mt-4 px-4 py-3 bg-red-50 border border-red-200 rounded-md flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm text-red-700">{markReadError}</span>
+              </div>
+              <button
+                onClick={() => setMarkReadError(null)}
+                className="text-red-600 hover:text-red-800"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          <div className="divide-y divide-theme-subtle">
+            {items.length === 0 ? (
+              <div className="px-6 py-12 text-center text-theme-secondary">
+                {tHome('items.noItems')}
+              </div>
+            ) : (
+              <>
+                {items.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`px-6 py-4 hover:bg-theme-surface/80 transition-colors ${
+                      item.read ? "opacity-60" : ""
                     }`}
                   >
-                    {tHome('tags.all')}
-                  </button>
-                  {allTags.map((tag) => (
-                    <button
-                      key={tag}
-                      onClick={() => handleTagClick(tag)}
-                      className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                        selectedTag === tag
-                          ? "bg-accent text-white"
-                          : "bg-theme-surface text-theme-primary hover:bg-theme-surface/80"
-                      }`}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="bg-theme-surface rounded-lg shadow-theme border border-theme p-4 mt-4">
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => setFeedsExpanded(!feedsExpanded)}
-                  className="flex items-center gap-2 text-lg font-semibold text-theme-primary hover:bg-theme-surface/50 rounded-md px-2 py-1 transition-colors"
-                >
-                  <span>{tHome('feeds.title')}</span>
-                  <svg
-                    className={`w-5 h-5 transition-transform ${feedsExpanded ? 'rotate-180' : ''}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                <button
-                  onClick={refreshAllFeeds}
-                  disabled={refreshingAll}
-                  className="px-3 py-1 text-sm text-accent hover:bg-accent/10 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                  title="全部刷新"
-                >
-                  {refreshingAll ? (
-                    <>
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <a
+                          href={`/reader/${item.id}`}
+                          onClick={() => {
+                            handleItemClick(item.id);
+                            if (!item.read) markAsRead(item.id);
+                          }}
+                          className={`text-lg font-semibold hover:underline cursor-pointer flex-1 ${
+                            item.read
+                              ? "text-theme-primary"
+                              : "text-accent"
+                          }`}
+                        >
+                          {item.title}
+                        </a>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <a
+                            href={item.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-1 text-xs text-accent hover:bg-accent/10 rounded-md transition-colors flex items-center gap-1"
+                            title="打开原文"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                            原文
+                          </a>
+                          {!item.read && (
+                            <button
+                              onClick={() => markAsRead(item.id)}
+                              className="px-2 py-1 text-xs text-accent hover:bg-accent/10 rounded-md transition-colors"
+                              title={tHome('items.markAsRead')}
+                            >
+                              ✓
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-1 text-sm text-theme-secondary">
+                        {item.feed.title} •{" "}
+                        {new Date(item.pubDate).toLocaleDateString()}
+                        {item.read && (
+                          <span className="ml-2 text-xs text-theme-muted">
+                            {tHome('items.read')}
+                          </span>
+                        )}
+                      </div>
+                      {item.description && (
+                        <div className="mt-2 text-theme-primary line-clamp-3">
+                          {item.description.replace(/<[^>]*>/g, "")}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {loadingMore && (
+                  <div className="px-6 py-8 text-center text-theme-secondary">
+                    <div className="flex items-center justify-center gap-2">
                       <svg
-                        className="animate-spin w-4 h-4"
+                        className="animate-spin h-5 w-5 text-accent"
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
                         viewBox="0 0 24 24"
@@ -704,266 +800,19 @@ export default function Home() {
                           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                         ></path>
                       </svg>
-                      刷新中...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      全部刷新
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {feedsExpanded && (
-                <div className="mt-4 space-y-2">
-                  <button
-                    onClick={handleAllFeedsClick}
-                    className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
-                      !selectedFeedId
-                        ? "bg-accent/20 text-accent"
-                        : "hover:bg-theme-surface text-theme-primary"
-                    }`}
-                  >
-                    {tHome('feeds.allFeeds')}
-                  </button>
-                  {feeds.map((feed) => (
-                    <div key={feed.id} className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleFeedClick(feed.id)}
-                          className={`flex-1 text-left px-3 py-2 rounded-md transition-colors text-sm ${
-                            selectedFeedId === feed.id
-                              ? "bg-accent/20 text-accent"
-                              : "hover:bg-theme-surface text-theme-primary"
-                          }`}
-                        >
-                          {feed.title}
-                        </button>
-                        <button
-                          onClick={() => refreshFeed(feed.id)}
-                          disabled={refreshing === feed.id}
-                          className={`px-2 py-1 text-xs rounded transition-colors ${
-                            refreshing === feed.id
-                              ? "text-accent/60 cursor-not-allowed"
-                              : "text-accent hover:bg-accent/10"
-                          }`}
-                          title={refreshing === feed.id ? tHome('feeds.refreshing') : tHome('feeds.refresh')}
-                        >
-                          {refreshing === feed.id ? "⟳" : "↻"}
-                        </button>
-                        <button
-                          onClick={() => deleteFeed(feed.id)}
-                          disabled={deletingFeed === feed.id}
-                          className="px-2 py-1 text-xs rounded transition-colors text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-50"
-                          title={tHome('feeds.unsubscribe')}
-                        >
-                          {deletingFeed === feed.id ? "..." : "✕"}
-                        </button>
-                      </div>
-
-                      {feed.tags && feed.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 px-1">
-                          {feed.tags.map((tag) => (
-                            <span
-                              key={tag}
-                              className="px-2 py-0.5 text-xs font-medium bg-accent/20 text-accent rounded"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      <span>{t('common.loading')}</span>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="lg:col-span-3">
-            <div className="bg-theme-surface rounded-lg shadow-theme border border-theme">
-              <div className="px-6 py-4 border-b border-theme-subtle">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-xl font-semibold text-theme-primary">
-                    {selectedFeedId
-                      ? feeds.find((f) => f.id === selectedFeedId)?.title ||
-                        "Feed"
-                      : tHome('items.title')}
-                    {selectedTag && ` - ${selectedTag}`}
-                  </h2>
-                  {items.some(item => !item.read) && (
-                    <button
-                      onClick={markAllAsRead}
-                      disabled={markingAllRead}
-                      className="px-3 py-1 text-sm font-medium text-accent hover:bg-accent/10 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {markingAllRead ? "标记中..." : "全部已读"}
-                    </button>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleReadStatusFilterChange("all")}
-                    className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                      readStatusFilter === "all"
-                        ? "bg-accent text-white"
-                        : "bg-theme-surface text-theme-primary hover:bg-theme-surface/80"
-                    }`}
-                  >
-                    {tHome('filter.all')}
-                  </button>
-                  <button
-                    onClick={() => handleReadStatusFilterChange("unread")}
-                    className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                      readStatusFilter === "unread"
-                        ? "bg-accent text-white"
-                        : "bg-theme-surface text-theme-primary hover:bg-theme-surface/80"
-                    }`}
-                  >
-                    {tHome('filter.unread')}
-                  </button>
-                  <button
-                    onClick={() => handleReadStatusFilterChange("read")}
-                    className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                      readStatusFilter === "read"
-                        ? "bg-accent text-white"
-                        : "bg-theme-surface text-theme-primary hover:bg-theme-surface/80"
-                    }`}
-                  >
-                    {tHome('filter.read')}
-                  </button>
-                </div>
-              </div>
-
-              {markReadError && (
-                <div className="mt-4 px-4 py-3 bg-red-50 border border-red-200 rounded-md flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="text-sm text-red-700">{markReadError}</span>
                   </div>
-                  <button
-                    onClick={() => setMarkReadError(null)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-
-              <div className="divide-y divide-theme-subtle">
-                {items.length === 0 ? (
-                  <div className="px-6 py-12 text-center text-theme-secondary">
-                    {tHome('items.noItems')}
-                  </div>
-                ) : (
-                  <>
-                    {items.map((item) => (
-                      <div
-                        key={item.id}
-                        className={`px-6 py-4 hover:bg-theme-surface/80 transition-colors ${
-                          item.read ? "opacity-60" : ""
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
-                            <a
-                              href={`/reader/${item.id}`}
-                              onClick={() => {
-                                handleItemClick(item.id);
-                                if (!item.read) markAsRead(item.id);
-                              }}
-                              className={`text-lg font-semibold hover:underline cursor-pointer ${
-                                item.read
-                                  ? "text-theme-primary"
-                                  : "text-accent"
-                              }`}
-                            >
-                              {item.title}
-                            </a>
-                            <div className="mt-1 text-sm text-theme-secondary">
-                              {item.feed.title} •{" "}
-                              {new Date(item.pubDate).toLocaleDateString()}
-                              {item.read && (
-                                <span className="ml-2 text-xs text-theme-muted">
-                                  {tHome('items.read')}
-                                </span>
-                              )}
-                            </div>
-                            {item.description && (
-                              <div className="mt-2 text-theme-primary line-clamp-3">
-                                {item.description.replace(/<[^>]*>/g, "")}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <a
-                              href={item.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-3 py-1 text-xs text-accent hover:bg-accent/10 rounded-md transition-colors flex items-center gap-1"
-                              title="打开原文"
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                              </svg>
-                              原文
-                            </a>
-                            {!item.read && (
-                              <button
-                                onClick={() => markAsRead(item.id)}
-                                className="px-3 py-1 text-xs text-accent hover:bg-accent/10 rounded-md transition-colors"
-                                title={tHome('items.markAsRead')}
-                              >
-                                ✓
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {loadingMore && (
-                      <div className="px-6 py-8 text-center text-theme-secondary">
-                        <div className="flex items-center justify-center gap-2">
-                          <svg
-                            className="animate-spin h-5 w-5 text-accent"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            ></circle>
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                            ></path>
-                          </svg>
-                          <span>{t('common.loading')}</span>
-                        </div>
-                      </div>
-                    )}
-                    {!hasMore && items.length > 0 && (
-                      <div className="px-6 py-4 text-center text-sm text-theme-muted">
-                        {tHome('items.noMoreItems') || '没有更多内容了'}
-                      </div>
-                    )}
-                  </>
                 )}
-              </div>
-            </div>
+                {!hasMore && items.length > 0 && (
+                  <div className="px-6 py-4 text-center text-sm text-theme-muted">
+                    {tHome('items.noMoreItems') || '没有更多内容了'}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
           </div>
         </div>
       </div>

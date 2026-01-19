@@ -10,6 +10,9 @@ CREATE TABLE "user" (
     "role" "UserRole" NOT NULL DEFAULT 'USER',
     "reading_settings" JSONB,
     "summary_language" TEXT NOT NULL DEFAULT 'zh',
+    "item_retention_days" INTEGER NOT NULL DEFAULT -1,
+    "item_retention_only_read" BOOLEAN NOT NULL DEFAULT true,
+    "last_item_cleanup" TIMESTAMP(3);
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
