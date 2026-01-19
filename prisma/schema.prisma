@@ -22,17 +22,20 @@ enum UserRole {
 }
 
 model User {
-  id               String   @id @default(cuid()) @map("id")
-  email            String   @unique @map("email")
-  password         String   @map("password")
-  name             String?  @map("name")
-  role             UserRole  @default(USER) @map("role")
-  readingSettings  Json?     @map("reading_settings")
-  summaryLanguage  String    @default("zh") @map("summary_language")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
-  feeds            Feed[]
-  summaries        DailySummary[]
+  id                  String   @id @default(cuid()) @map("id")
+  email               String   @unique @map("email")
+  password            String   @map("password")
+  name                String?  @map("name")
+  role                UserRole  @default(USER) @map("role")
+  readingSettings     Json?     @map("reading_settings")
+  summaryLanguage     String    @default("zh") @map("summary_language")
+  itemRetentionDays   Int       @default(-1) @map("item_retention_days")
+  itemRetentionOnlyRead Boolean  @default(true) @map("item_retention_only_read")
+  lastItemCleanup     DateTime? @map("last_item_cleanup")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  feeds               Feed[]
+  summaries           DailySummary[]
 
   @@map("user")
 }

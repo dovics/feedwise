@@ -48,12 +48,25 @@ export default function SettingsPage() {
   const [newFeedTags, setNewFeedTags] = useState("");
   const [addingFeed, setAddingFeed] = useState(false);
   const [addFeedError, setAddFeedError] = useState("");
+  const [cleanupSettings, setCleanupSettings] = useState({
+    itemRetentionDays: -1,
+    itemRetentionOnlyRead: true,
+    lastItemCleanup: null as string | null
+  });
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [executingCleanup, setExecutingCleanup] = useState(false);
+  const [cleanupStats, setCleanupStats] = useState({
+    eligibleCount: 0,
+    message: ""
+  });
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/auth/signin");
     } else if (status === "authenticated") {
       fetchFeeds();
+      fetchCleanupSettings();
+      fetchCleanupStats();
     }
   }, [status, router]);
 
@@ -452,6 +465,91 @@ export default function SettingsPage() {
     setNewFeedTitleFilter("");
     setNewFeedDefaultReadStatus(false);
     setNewFeedTags("");
+  };
+
+  const fetchCleanupSettings = async () => {
+    try {
+      const res = await fetch("/api/settings/cleanup");
+      const data = await res.json();
+      if (res.ok) {
+        setCleanupSettings(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch cleanup settings:", error);
+    }
+  };
+
+  const fetchCleanupStats = async () => {
+    try {
+      const res = await fetch("/api/items/cleanup");
+      const data = await res.json();
+      if (res.ok) {
+        setCleanupStats({
+          eligibleCount: data.eligibleCount || 0,
+          message: data.message || ""
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch cleanup stats:", error);
+    }
+  };
+
+  const updateCleanupSettings = async () => {
+    try {
+      setCleanupLoading(true);
+      const res = await fetch("/api/settings/cleanup", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itemRetentionDays: cleanupSettings.itemRetentionDays,
+          itemRetentionOnlyRead: cleanupSettings.itemRetentionOnlyRead
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || t('errors.unknown'));
+        return;
+      }
+
+      await fetchCleanupSettings();
+      await fetchCleanupStats();
+      setError("");
+    } catch (error) {
+      setError(t('errors.network'));
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
+  const executeCleanup = async () => {
+    if (!confirm("确定要立即清理旧文章吗？此操作不可撤销。")) {
+      return;
+    }
+
+    try {
+      setExecutingCleanup(true);
+      const res = await fetch("/api/items/cleanup", {
+        method: "POST"
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || t('errors.unknown'));
+        return;
+      }
+
+      const data = await res.json();
+      alert(data.message);
+      await fetchCleanupSettings();
+      await fetchCleanupStats();
+      await fetchFeeds();
+      setError("");
+    } catch (error) {
+      setError(t('errors.network'));
+    } finally {
+      setExecutingCleanup(false);
+    }
   };
 
   if (status === "loading") {
@@ -954,6 +1052,98 @@ export default function SettingsPage() {
                   </span>
                 ))
               )}
+            </div>
+          </div>
+
+          <div className="mt-8">
+            <h2 className="text-2xl font-bold text-theme-primary mb-4">
+              文章清理设置
+            </h2>
+            <div className="bg-theme-surface rounded-lg shadow-theme border border-theme p-6">
+              <div className="space-y-6">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-medium text-theme-primary">
+                      自动清理旧文章
+                    </label>
+                    <select
+                      value={cleanupSettings.itemRetentionDays}
+                      onChange={(e) => setCleanupSettings({
+                        ...cleanupSettings,
+                        itemRetentionDays: parseInt(e.target.value)
+                      })}
+                      disabled={cleanupLoading}
+                      className="px-4 py-2 border border-theme rounded-md focus-ring bg-theme-input text-theme-text"
+                    >
+                      <option value="-1">禁用</option>
+                      <option value="7">7 天</option>
+                      <option value="30">30 天</option>
+                      <option value="60">60 天</option>
+                      <option value="90">90 天</option>
+                      <option value="180">180 天</option>
+                      <option value="365">365 天</option>
+                    </select>
+                  </div>
+                  <p className="text-xs text-theme-secondary">
+                    自动删除超过指定天数的文章。设置为"禁用"则不自动清理。
+                  </p>
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={cleanupSettings.itemRetentionOnlyRead}
+                      onChange={(e) => setCleanupSettings({
+                        ...cleanupSettings,
+                        itemRetentionOnlyRead: e.target.checked
+                      })}
+                      disabled={cleanupLoading || cleanupSettings.itemRetentionDays === -1}
+                      className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-accent focus:ring-accent cursor-pointer"
+                    />
+                    <span className="text-sm font-medium text-theme-primary">
+                      仅清理已读文章
+                    </span>
+                  </label>
+                  <p className="mt-1 text-xs text-theme-secondary">
+                    开启后，只会删除已读的旧文章，未读文章将被保留。
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-theme-subtle">
+                  <div>
+                    <p className="text-sm font-medium text-theme-primary">
+                      当前状态
+                    </p>
+                    <p className="text-xs text-theme-secondary mt-1">
+                      {cleanupStats.eligibleCount > 0
+                        ? `${cleanupStats.eligibleCount} 篇文章可被清理`
+                        : "暂无可清理的文章"}
+                      {cleanupSettings.lastItemCleanup && (
+                        <span className="block mt-1">
+                          上次清理: {new Date(cleanupSettings.lastItemCleanup).toLocaleString('zh-CN')}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={updateCleanupSettings}
+                      disabled={cleanupLoading}
+                      className="px-4 py-2 bg-accent hover:bg-opacity-80 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {cleanupLoading ? "保存中..." : "保存设置"}
+                    </button>
+                    <button
+                      onClick={executeCleanup}
+                      disabled={executingCleanup || cleanupSettings.itemRetentionDays === -1 || cleanupStats.eligibleCount === 0}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {executingCleanup ? "清理中..." : "立即清理"}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

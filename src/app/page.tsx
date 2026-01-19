@@ -566,7 +566,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      <nav className="bg-theme-surface-transparent backdrop-blur-sm border-b border-theme px-6 py-4">
+      <nav className="bg-theme-surface-transparent backdrop-blur-sm border-b border-theme px-6 py-4 relative z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <h1 className="text-2xl font-bold text-theme-primary">{t('nav.title')}</h1>
           <UserMenu />
@@ -902,15 +902,29 @@ export default function Home() {
                               </div>
                             )}
                           </div>
-                          {!item.read && (
-                            <button
-                              onClick={() => markAsRead(item.id)}
-                              className="px-3 py-1 text-xs text-accent hover:bg-accent/10 rounded-md transition-colors"
-                              title={tHome('items.markAsRead')}
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={item.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1 text-xs text-accent hover:bg-accent/10 rounded-md transition-colors flex items-center gap-1"
+                              title="打开原文"
                             >
-                              ✓
-                            </button>
-                          )}
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                              原文
+                            </a>
+                            {!item.read && (
+                              <button
+                                onClick={() => markAsRead(item.id)}
+                                className="px-3 py-1 text-xs text-accent hover:bg-accent/10 rounded-md transition-colors"
+                                title={tHome('items.markAsRead')}
+                              >
+                                ✓
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
