@@ -63,6 +63,7 @@
       "refresh": "Refresh",
       "refreshing": "Refreshing...",
       "unsubscribe": "Unsubscribe",
+      "deleteConfirm": "Are you sure you want to unsubscribe from this RSS feed?",
       "itemsCount": "{count} items"
     },
     "tags": {
@@ -76,6 +77,9 @@
       "read": "Read",
       "unread": "Unread",
       "markAsRead": "Mark as Read",
+      "markAsReadError": "Failed to mark as read",
+      "networkError": "Network error. Please try again.",
+      "errorNotFound": "Article not found - removed from list",
       "publishedAt": "Published on"
     },
     "filter": {

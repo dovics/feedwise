@@ -42,15 +42,32 @@ export default function ReaderPage({ params }: { params: Promise<{ id: string }>
   useEffect(() => {
     const fetchItem = async () => {
       try {
-        const res = await fetch(`/api/items`);
-        const data = await res.json();
-        const foundItem = data.items.find((i: Item) => i.id === id);
+        // 首先尝试从 sessionStorage 获取（从首页传入的数据）
+        const cachedItem = sessionStorage.getItem(`feedflow_item_${id}`);
 
-        if (foundItem) {
-          setItem(foundItem);
-        } else {
-          setError(t('reader.errorNotFound') || "Article not found");
+        if (cachedItem) {
+          const parsedItem = JSON.parse(cachedItem);
+          setItem(parsedItem);
+          setLoading(false);
+          // 清除缓存，避免旧数据残留
+          sessionStorage.removeItem(`feedflow_item_${id}`);
+          return;
         }
+
+        // 如果没有缓存数据，则调用 API 获取
+        const res = await fetch(`/api/items/${id}`);
+
+        if (!res.ok) {
+          if (res.status === 404) {
+            setError(t('reader.errorNotFound') || "Article not found");
+          } else {
+            setError(t('reader.errorLoading') || "Failed to load article");
+          }
+          return;
+        }
+
+        const data = await res.json();
+        setItem(data.item);
       } catch (error) {
         console.error("Failed to fetch item:", error);
         setError(t('reader.errorLoading') || "Failed to load article");

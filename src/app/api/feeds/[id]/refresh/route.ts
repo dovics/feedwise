@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import Parser from "rss-parser";
+import { logger } from "@/lib/logger";
 
 const parser = new Parser({
   timeout: 15000,
@@ -13,14 +14,20 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const startTime = Date.now();
+  let userId: string | undefined;
+  const { id } = await params;
+
   try {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
+      logger.logApiRequestError('POST', `/api/feeds/${id}/refresh`, new Error('Unauthorized'), undefined, Date.now() - startTime);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = await params;
+    userId = session.user.id;
+    logger.logApiRequestStart('POST', `/api/feeds/${id}/refresh`, userId);
 
     const feed = await prisma.feed.findUnique({
       where: { id },
@@ -28,14 +35,17 @@ export async function POST(
     });
 
     if (!feed || feed.userId !== session.user.id) {
+      logger.warn('Feed not found for refresh', { userId, feedId: id });
       return NextResponse.json({ error: "Feed not found" }, { status: 404 });
     }
 
     let parsedFeed;
     try {
+      logger.info('Refreshing RSS feed', { userId, feedId: id, url: feed.url });
       parsedFeed = await parser.parseURL(feed.url);
+      logger.info('RSS feed refreshed successfully', { userId, feedId: id, itemCount: parsedFeed.items.length });
     } catch (parseError) {
-      console.error("RSS parse error during refresh:", parseError);
+      logger.logApiRequestError('POST', `/api/feeds/${id}/refresh`, parseError as Error, userId, Date.now() - startTime, { phase: 'rss_parse' });
 
       if (parseError instanceof Error) {
         if (parseError.message.includes('ETIMEDOUT') || parseError.message.includes('timeout')) {
@@ -58,6 +68,9 @@ export async function POST(
       );
     }
 
+    let newItemsCount = 0;
+    let filteredItemsCount = 0;
+
     for (const item of parsedFeed.items) {
       const existingItem = await prisma.item.findFirst({
         where: {
@@ -73,10 +86,11 @@ export async function POST(
             const regex = new RegExp(feed.titleFilter, 'i');
             if (regex.test(item.title)) {
               // 标题匹配过滤器，跳过此项目
+              filteredItemsCount++;
               continue;
             }
           } catch (error) {
-            console.error("Invalid regex filter:", error);
+            logger.warn('Invalid regex filter during refresh', { userId, feedId: id, titleFilter: feed.titleFilter }, error as Error);
             // 如果正则表达式无效，继续添加项目
           }
         }
@@ -90,7 +104,12 @@ export async function POST(
             feedId: id
           }
         });
+        newItemsCount++;
       }
+    }
+
+    if (newItemsCount > 0 || filteredItemsCount > 0) {
+      logger.info('Feed refresh completed', { userId, feedId: id, newItemsCount, filteredItemsCount });
     }
 
     const updatedFeed = await prisma.feed.findUnique({
@@ -105,9 +124,10 @@ export async function POST(
       }
     });
 
+    logger.logApiRequestSuccess('POST', `/api/feeds/${id}/refresh`, userId, Date.now() - startTime, { newItemsCount, totalItems: updatedFeed?.items.length || 0 });
     return NextResponse.json({ feed: updatedFeed });
   } catch (error) {
-    console.error("Feed refresh error:", error);
+    logger.logApiRequestError('POST', `/api/feeds/${id}/refresh`, error as Error, userId, Date.now() - startTime);
 
     if (error instanceof Error) {
       if (error.message.includes('connect') || error.message.includes('ETIMEDOUT')) {

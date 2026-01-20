@@ -63,6 +63,7 @@
       "refresh": "刷新",
       "refreshing": "刷新中...",
       "unsubscribe": "取消订阅",
+      "deleteConfirm": "确定要取消订阅这个 RSS 源吗？",
       "itemsCount": "篇文章"
     },
     "tags": {
@@ -76,6 +77,9 @@
       "read": "已读",
       "unread": "未读",
       "markAsRead": "标记为已读",
+      "markAsReadError": "标记已读失败",
+      "networkError": "网络错误，请稍后重试",
+      "errorNotFound": "文章未找到 - 已从列表中移除",
       "publishedAt": "发布于"
     },
     "filter": {

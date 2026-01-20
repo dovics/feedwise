@@ -75,6 +75,23 @@ export default function Home() {
     if (status === "unauthenticated") {
       router.push("/auth/signin");
     } else if (status === "authenticated") {
+      // 清理过期的 item 缓存（超过 1 小时的）
+      const oneHourAgo = Date.now() - 60 * 60 * 1000;
+      Object.keys(sessionStorage)
+        .filter(key => key.startsWith('feedflow_item_'))
+        .forEach(key => {
+          try {
+            const item = JSON.parse(sessionStorage.getItem(key) || '');
+            // 如果 item 有 pubDate，检查是否过期
+            if (item.pubDate && new Date(item.pubDate).getTime() < oneHourAgo) {
+              sessionStorage.removeItem(key);
+            }
+          } catch {
+            // 如果解析失败，直接删除
+            sessionStorage.removeItem(key);
+          }
+        });
+
       fetchFeeds();
 
       // Check and generate today's summary
@@ -419,8 +436,11 @@ export default function Home() {
           setTimeout(() => setMarkReadError(null), 3000);
         } else {
           setMarkReadError(`${tHome('items.markAsReadError') || "Failed to mark as read"}: ${errorMessage}`);
+          // Auto-dismiss error after 3 seconds
+          setTimeout(() => setMarkReadError(null), 3000);
         }
         console.error("Failed to mark item as read:", errorMessage);
+        // Don't return - let the navigation continue even if marking as read fails
         return;
       }
 
@@ -432,10 +452,25 @@ export default function Home() {
     } catch (error) {
       console.error("Failed to mark item as read:", error);
       setMarkReadError(tHome('items.networkError') || "Network error. Please try again.");
+      // Auto-dismiss error after 3 seconds
+      setTimeout(() => setMarkReadError(null), 3000);
+      // Don't throw - let the navigation continue even if marking as read fails
     }
   };
 
   const handleItemClick = (itemId: string) => {
+    // 清理旧的 item 缓存（保留最近 10 个）
+    const itemKeys = Object.keys(sessionStorage)
+      .filter(key => key.startsWith('feedflow_item_'))
+      .sort(); // 按字母排序，最老的在前面
+
+    // 删除超过 10 个的旧缓存
+    if (itemKeys.length > 10) {
+      itemKeys.slice(0, itemKeys.length - 10).forEach(key => {
+        sessionStorage.removeItem(key);
+      });
+    }
+
     // 保存当前状态到 sessionStorage
     const stateToSave = {
       feedId: selectedFeedId,
@@ -445,6 +480,12 @@ export default function Home() {
       items: items
     };
     sessionStorage.setItem('feedflow_home_state', JSON.stringify(stateToSave));
+
+    // 将当前 item 数据存到 sessionStorage，reader 页面可以直接使用
+    const item = items.find(i => i.id === itemId);
+    if (item) {
+      sessionStorage.setItem(`feedflow_item_${itemId}`, JSON.stringify(item));
+    }
   };
 
   const refreshAllFeeds = async () => {
@@ -688,21 +729,24 @@ export default function Home() {
           </div>
 
           {markReadError && (
-            <div className="mt-4 px-4 py-3 bg-red-50 border border-red-200 rounded-md flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-sm text-red-700">{markReadError}</span>
+            <div className="fixed bottom-4 right-4 z-50 max-w-md animate-slide-up">
+              <div className="px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md shadow-lg flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <svg className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-sm text-red-700 dark:text-red-300 truncate">{markReadError}</span>
+                </div>
+                <button
+                  onClick={() => setMarkReadError(null)}
+                  className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 flex-shrink-0"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <button
-                onClick={() => setMarkReadError(null)}
-                className="text-red-600 hover:text-red-800"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
             </div>
           )}
 
@@ -726,7 +770,10 @@ export default function Home() {
                           href={`/reader/${item.id}`}
                           onClick={() => {
                             handleItemClick(item.id);
-                            if (!item.read) markAsRead(item.id);
+                            if (!item.read) {
+                              // Fire and forget - don't await, let navigation continue
+                              markAsRead(item.id);
+                            }
                           }}
                           className={`text-lg font-semibold hover:underline cursor-pointer flex-1 ${
                             item.read

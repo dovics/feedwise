@@ -2,14 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
+  const startTime = Date.now();
+  let userId: string | undefined;
+
   try {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
+      logger.logApiRequestError('GET', '/api/items', new Error('Unauthorized'), undefined, Date.now() - startTime);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    userId = session.user.id;
 
     const searchParams = req.nextUrl.searchParams;
     const feedId = searchParams.get("feedId");
@@ -17,6 +24,8 @@ export async function GET(req: NextRequest) {
     const readStatus = searchParams.get("read");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
+
+    logger.logApiRequestStart('GET', '/api/items', userId, { feedId, tag, readStatus, page, limit });
 
     const skip = (page - 1) * limit;
 
@@ -43,7 +52,7 @@ export async function GET(req: NextRequest) {
         try {
           filterMap.set(feed.id, new RegExp(feed.titleFilter, 'i'));
         } catch (error) {
-          console.error("Invalid regex filter for feed:", feed.id, error);
+          logger.warn('Invalid regex filter for feed', { userId, feedId: feed.id, titleFilter: feed.titleFilter }, error as Error);
           filterMap.set(feed.id, null);
         }
       } else {
@@ -72,12 +81,14 @@ export async function GET(req: NextRequest) {
     const filteredItems = items.filter(item => {
       const filter = filterMap.get(item.feedId);
       if (!filter) return true; // 没有过滤器，显示所有项目
-    
+
       return !filter.test(item.title); // 匹配过滤器的项目将被排除
     }).slice(0, limit); // 确保返回正确的数量
 
+    logger.logApiRequestSuccess('GET', '/api/items', userId, Date.now() - startTime, { itemCount: filteredItems.length, totalFetched: items.length });
     return NextResponse.json({ items: filteredItems });
   } catch (error) {
+    logger.logApiRequestError('GET', '/api/items', error as Error, userId, Date.now() - startTime);
     return NextResponse.json(
       { error: "Failed to fetch items" },
       { status: 400 }

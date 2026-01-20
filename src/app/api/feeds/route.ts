@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import Parser from "rss-parser";
 import { z } from "zod";
 import { categorizeFeed } from "@/lib/openai-categorizer";
+import { logger } from "@/lib/logger";
 
 const parser = new Parser({
   timeout: 15000,
@@ -20,15 +21,24 @@ const feedSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+  let userId: string | undefined;
+
   try {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
+      logger.logApiRequestError('POST', '/api/feeds', new Error('Unauthorized'), undefined, Date.now() - startTime);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    userId = session.user.id;
+    logger.logApiRequestStart('POST', '/api/feeds', userId);
+
     const body = await req.json();
     const { url, titleFilter } = feedSchema.parse(body);
+
+    logger.info('Feed subscription request received', { userId, url, hasTitleFilter: !!titleFilter });
 
     const existingFeed = await prisma.feed.findFirst({
       where: {
@@ -46,9 +56,11 @@ export async function POST(req: NextRequest) {
 
     let feed;
     try {
+      logger.info('Attempting to parse RSS feed', { userId, url });
       feed = await parser.parseURL(url);
+      logger.info('RSS feed parsed successfully', { userId, url, feedTitle: feed.title });
     } catch (parseError) {
-      console.error("RSS parse error:", parseError);
+      logger.logApiRequestError('POST', '/api/feeds', parseError as Error, userId, Date.now() - startTime, { url, phase: 'rss_parse' });
 
       if (parseError instanceof Error) {
         if (parseError.message.includes('ETIMEDOUT') || parseError.message.includes('timeout')) {
@@ -96,11 +108,14 @@ export async function POST(req: NextRequest) {
       try {
         const regex = new RegExp(titleFilter, 'i');
         filteredItems = feedItems.filter(item => !regex.test(item.title));
+        logger.info('Applied title filter', { userId, url, filterPattern: titleFilter, originalCount: feedItems.length, filteredCount: filteredItems.length });
       } catch (error) {
-        console.error("Invalid regex filter:", error);
+        logger.warn('Invalid regex filter, skipping filtering', { userId, url, titleFilter }, error as Error);
         // 如果正则表达式无效，不过滤任何项目
       }
     }
+
+    logger.info('Creating feed in database', { userId, url, itemCount: filteredItems.length });
 
     const newFeed = await prisma.feed.create({
       data: {
@@ -118,6 +133,8 @@ export async function POST(req: NextRequest) {
       }
     });
 
+    logger.logDatabaseOperation('create', 'Feed', { userId, feedId: newFeed.id, itemCount: newFeed.items.length });
+
     categorizeFeed({
       url: newFeed.url,
       title: newFeed.title || undefined,
@@ -128,18 +145,20 @@ export async function POST(req: NextRequest) {
       }))
     }).then(async (tags) => {
       if (tags) {
+        logger.info('Auto-categorization successful', { userId, feedId: newFeed.id, tags });
         await prisma.feed.update({
           where: { id: newFeed.id },
           data: { tags }
         });
       }
     }).catch((error) => {
-      console.error("Failed to auto-categorize feed:", error);
+      logger.warn('Failed to auto-categorize feed', { userId, feedId: newFeed.id }, error as Error);
     });
 
+    logger.logApiRequestSuccess('POST', '/api/feeds', userId, Date.now() - startTime, { feedId: newFeed.id, itemCount: newFeed.items.length });
     return NextResponse.json({ feed: newFeed }, { status: 201 });
   } catch (error) {
-    console.error("Feed creation error:", error);
+    logger.logApiRequestError('POST', '/api/feeds', error as Error, userId, Date.now() - startTime);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -171,12 +190,19 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
+  const startTime = Date.now();
+  let userId: string | undefined;
+
   try {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
+      logger.logApiRequestError('GET', '/api/feeds', new Error('Unauthorized'), undefined, Date.now() - startTime);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    userId = session.user.id;
+    logger.logApiRequestStart('GET', '/api/feeds', userId);
 
     const feeds = await prisma.feed.findMany({
       where: {
@@ -194,8 +220,10 @@ export async function GET() {
       }
     });
 
+    logger.logApiRequestSuccess('GET', '/api/feeds', userId, Date.now() - startTime, { feedCount: feeds.length });
     return NextResponse.json({ feeds });
   } catch (error) {
+    logger.logApiRequestError('GET', '/api/feeds', error as Error, userId, Date.now() - startTime);
     return NextResponse.json(
       { error: "Failed to fetch feeds" },
       { status: 400 }
