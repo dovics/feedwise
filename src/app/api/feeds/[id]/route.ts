@@ -7,7 +7,7 @@ import { z } from "zod";
 const updateFeedSchema = z.object({
   tags: z.array(z.string().min(1).max(50)).optional(),
   defaultReadStatus: z.boolean().optional(),
-  titleFilter: z.string().optional()
+  titleFilter: z.string().nullable().optional()
 });
 
 export async function PATCH(
