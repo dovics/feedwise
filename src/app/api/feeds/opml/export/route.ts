@@ -30,8 +30,16 @@ export async function GET(req: NextRequest) {
 
     logger.logDatabaseOperation('read', 'Feed', { userId, feedCount: feeds.length });
 
-    // 生成 OPML XML
-    const opmlContent = generateOPML(feeds);
+    // 生成 OPML XML (过滤掉 title 为 null 的 feeds)
+    const feedsForOPML = feeds
+      .filter(feed => feed.title !== null)
+      .map(feed => ({
+        url: feed.url,
+        title: feed.title as string,
+        tags: feed.tags || []
+      }));
+
+    const opmlContent = generateOPML(feedsForOPML);
 
     // 设置响应头，触发文件下载
     const headers = new Headers();

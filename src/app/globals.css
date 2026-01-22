@@ -3,6 +3,14 @@
 @layer base {
   html {
     @apply antialiased;
+    color-scheme: light dark;
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
   }
 
   body {
@@ -10,18 +18,46 @@
     color: var(--theme-text-primary, #000000);
     font-family: var(--font-family, 'Inter', system-ui, -apple-system, sans-serif);
     transition: background-color 0.2s ease, color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
   }
 
+  /* Improved focus states following Web Design Guidelines */
   .focus-ring {
     outline: none;
   }
 
-  .focus-ring:focus {
-    box-shadow: 0 0 0 2px var(--theme-background), 0 0 0 4px var(--theme-focus-ring, #2563EB);
+  .focus-ring:focus-visible {
+    outline: 2px solid var(--theme-focus-ring, #2563EB);
+    outline-offset: 2px;
+    border-radius: 2px;
   }
 
-  .focus-ring:focus-visible {
-    box-shadow: 0 0 0 2px var(--theme-background), 0 0 0 4px var(--theme-focus-ring, #2563EB);
+  /* Skip link for accessibility */
+  .skip-link {
+    position: absolute;
+    top: -100px;
+    left: 0;
+    background: var(--theme-accent, #2563EB);
+    color: white;
+    padding: 8px 16px;
+    z-index: 100;
+    transition: top 0.3s;
+  }
+
+  .skip-link:focus {
+    top: 0;
+  }
+
+  /* Reduce motion for users who prefer it */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
